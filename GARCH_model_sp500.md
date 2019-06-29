@@ -1,6 +1,8 @@
 GARCH model of S&P500
 ================
 
+Apply GARCH model to S&P500 daily return data. GARCH model predicts future volatility of return.
+
 Setup
 =====
 
@@ -50,10 +52,16 @@ EDA
 ===
 
 ``` r
-hist(sp, nclass = 50)
+plot.zoo(sp)
 ```
 
 ![](GARCH_model_sp500_files/figure-markdown_github/unnamed-chunk-4-1.png)
+
+``` r
+hist(sp, nclass = 50)
+```
+
+![](GARCH_model_sp500_files/figure-markdown_github/unnamed-chunk-5-1.png)
 
 ``` r
 summary(sp)
@@ -80,3 +88,66 @@ sqrt(252) * sd(sp)
 ```
 
     ## [1] 0.179785
+
+GARCH Model
+===========
+
+``` r
+# GARCH (1,1) model with constant mean
+garchspec <- ugarchspec(mean.model = list(armaOrder = c(0,0)),
+                        variance.model = list(model = "sGARCH"),
+                        distribution.model = "norm")
+
+# Estimate GARCH model
+garchfit <- ugarchfit(data = sp,
+                      spec = garchspec)
+
+# coefficients
+garchcoef <- coef(garchfit)
+
+# Unconditional variance
+garchuncvar <- uncvariance(garchfit)
+
+# Predicted mean
+garchmean <- fitted(garchfit)
+
+# Predicted volatilities
+garchvol <- sigma(garchfit)
+```
+
+``` r
+print(garchcoef)
+```
+
+    ##           mu        omega       alpha1        beta1 
+    ## 6.294217e-04 1.678606e-06 9.627891e-02 8.910213e-01
+
+``` r
+sqrt(garchuncvar)
+```
+
+    ## [1] 0.01149679
+
+``` r
+garchvol <- sigma(garchfit)
+plot(garchvol)
+```
+
+![](GARCH_model_sp500_files/figure-markdown_github/unnamed-chunk-11-1.png)
+
+Forecasting future volatilities
+===============================
+
+``` r
+# Forecast the volatility of the future returns
+garchforecast <- ugarchforecast(fitORspec = garchfit,
+                                n.ahead = 5)
+sigma(garchforecast)
+```
+
+    ##      2018-06-29
+    ## T+1 0.006919057
+    ## T+2 0.006995997
+    ## T+3 0.007071139
+    ## T+4 0.007144551
+    ## T+5 0.007216298
