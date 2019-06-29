@@ -1,3 +1,3 @@
 # time-series-analysis
 
-Check .md files
+See .md files
