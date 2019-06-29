@@ -7,6 +7,10 @@ Setup
 ``` r
 # library(RFinanceYJ)
 library(quantmod)
+library(rugarch)
+library(PerformanceAnalytics)
+library(moments)
+library(QRM)
 ```
 
 Data
@@ -76,3 +80,118 @@ plot.zoo(tepco$YJ9501.Close)
 ```
 
 ![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-3-1.png)
+
+``` r
+tepco_rt <- CalculateReturns(tepco$YJ9501.Close)[-1]
+hist(tepco_rt, nclass = 100, probability = TRUE)
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-4-1.png)
+
+Testing for normality
+=====================
+
+``` r
+tepco_rt_num <- sort(as.numeric(tepco_rt))
+mu <- mean(tepco_rt_num)
+sigma <- sd(tepco_rt_num)
+skew <- skewness(tepco_rt_num)
+kurt <- kurtosis(tepco_rt_num)
+round(c(mu, sigma, skew, kurt), 3)
+```
+
+    ## [1]  0.000  0.024  1.481 32.188
+
+``` r
+hist(tepco_rt_num, nclass = 100, probability = TRUE)
+lines(tepco_rt_num, dnorm(tepco_rt_num, mean = mu, sd = sigma), col = "red")
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-6-1.png)
+
+``` r
+qqnorm(tepco_rt_num)
+qqline(tepco_rt_num)
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-7-1.png)
+
+``` r
+jarque.test(tepco_rt_num)
+```
+
+    ## 
+    ##  Jarque-Bera Normality Test
+    ## 
+    ## data:  tepco_rt_num
+    ## JB = 398930, p-value < 2.2e-16
+    ## alternative hypothesis: greater
+
+It says it's not normal.
+
+Fit the Student t distribution
+==============================
+
+``` r
+tfit <- fit.st(tepco_rt_num)
+tpars <- tfit$par.ests
+tpars
+```
+
+    ##            nu            mu         sigma 
+    ##  2.3034461766  0.0008151239 -0.0112117384
+
+``` r
+nu_t <- tpars[1]
+mu_t <- tpars[2]
+sigma_t <- tpars[3]*-1
+```
+
+``` r
+hist(tepco_rt_num, nclass = 100, probability = TRUE)
+lines(tepco_rt_num, dnorm(tepco_rt_num, mean = mu, sd = sigma), col = "red")
+tval <- dt((tepco_rt_num - mu_t)/sigma_t, df = nu_t)/sigma_t
+lines(tepco_rt_num, tval, col = "blue")
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-10-1.png)
+
+Autocorrelation
+===============
+
+``` r
+acf(tepco_rt)
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-11-1.png)
+
+``` r
+acf(abs(tepco_rt))
+```
+
+![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-12-1.png)
+
+Ljung-Box test
+==============
+
+``` r
+Box.test(tepco_rt, lag = 10, type = "Ljung")
+```
+
+    ## 
+    ##  Box-Ljung test
+    ## 
+    ## data:  tepco_rt
+    ## X-squared = 69.629, df = 10, p-value = 5.229e-11
+
+``` r
+Box.test(abs(tepco_rt), lag = 10, type = "Ljung")
+```
+
+    ## 
+    ##  Box-Ljung test
+    ## 
+    ## data:  abs(tepco_rt)
+    ## X-squared = 6551.9, df = 10, p-value < 2.2e-16
+
+It says it's not iid.
