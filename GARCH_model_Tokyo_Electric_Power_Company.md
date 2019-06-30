@@ -1,7 +1,7 @@
-GARCH model of TEPCO
+GARCH model of Tokyo Electric Power Company
 ================
 
-Apply
+Apply GARCH model to Tokyo Electric Power Company (TEPCO).
 
 Package
 =======
@@ -19,10 +19,10 @@ Data
 ====
 
 ``` r
-# Fail
+# Fail (RFinanceYJ)
 # tepco <- quoteStockXtsData("9984")
 
-# Success
+# Success (quantmod)
 # 1951-08-24: Date listed on Tokyo Stock Exchange from Wiki
 # getSymbols("9501",
 #            src = "yahooj",
@@ -81,7 +81,7 @@ EDA
 plot.zoo(tepco$YJ9501.Close)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-3-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-3-1.png)
 
 ``` r
 tepco_rt <- CalculateReturns(tepco$YJ9501.Close)[-1]
@@ -91,7 +91,7 @@ tepco_rt <- CalculateReturns(tepco$YJ9501.Close)[-1]
 plot(tepco_rt)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-5-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-5-1.png)
 
 Rolling volatility estimation
 =============================
@@ -108,13 +108,13 @@ chart.RollingPerformance(
 )
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-6-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-6-1.png)
 
 ``` r
 hist(tepco_rt, nclass = 100, probability = TRUE)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-7-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-7-1.png)
 
 Testing for normality
 =====================
@@ -137,14 +137,14 @@ hist(tepco_rt_num, nclass = 100, probability = TRUE)
 lines(tepco_rt_num, dnorm(tepco_rt_num, mean = mu, sd = sigma), col = "red")
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-9-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-9-1.png)
 
 ``` r
 qqnorm(tepco_rt_num)
 qqline(tepco_rt_num)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-10-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-10-1.png)
 
 ``` r
 jarque.test(tepco_rt_num)
@@ -163,10 +163,25 @@ Another way of histogram
 ========================
 
 ``` r
-chart.Histogram(tepco_rt, methods = c("add.density", "add.normal"))
+chart.Histogram(
+  tepco_rt, 
+  methods = c("add.density", "add.normal"),
+  colorset = c("gray", "red", "blue")
+)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-12-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-12-1.png)
+
+``` r
+chart.Histogram(
+  tepco_rt, 
+  methods = c("add.density", "add.normal"),
+  colorset = c("gray", "red", "blue"),
+  ylim = c(0, 0.3)
+)
+```
+
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-13-1.png)
 
 Fit the Student t distribution
 ==============================
@@ -193,7 +208,7 @@ tval <- dt((tepco_rt_num - mu_t)/sigma_t, df = nu_t)/sigma_t
 lines(tepco_rt_num, tval, col = "blue")
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-14-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-15-1.png)
 
 Autocorrelation
 ===============
@@ -202,13 +217,13 @@ Autocorrelation
 acf(tepco_rt)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-15-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-16-1.png)
 
 ``` r
 acf(abs(tepco_rt))
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-16-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-17-1.png)
 
 Ljung-Box test
 ==============
@@ -272,7 +287,7 @@ Estimated volatilities
 plot(garchvol)
 ```
 
-![](GARCH_model_TEPCO_files/figure-markdown_github/unnamed-chunk-20-1.png)
+![](GARCH_model_Tokyo_Electric_Power_Company_files/figure-markdown_github/unnamed-chunk-21-1.png)
 
 ``` r
 garchforecast <- ugarchforecast(
