@@ -1,7 +1,7 @@
 GARCH model of S&P500
 ================
 
-Apply GARCH model to S&P500 daily return data. GARCH model predicts future volatility of return.
+Apply GARCH model for S&P500 daily return to estimate return volatility.
 
 Package
 =======
