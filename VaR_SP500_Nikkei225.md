@@ -203,6 +203,15 @@ plot.zoo(spn)
 
 ![](VaR_SP500_Nikkei225_files/figure-markdown_github/unnamed-chunk-10-1.png)
 
+Save data
+=========
+
+Export this merged data for some other analysis.
+
+``` r
+# saveRDS(spn, "SP500_N225_1965-01-05_2019-07-03.rds")
+```
+
 Transform data
 ==============
 
@@ -271,4 +280,4 @@ spn_cov <- spn_cor * sigma(garchfit_sp) *sigma(garchfit_n)
 plot(spn_cov)
 ```
 
-![](VaR_SP500_Nikkei225_files/figure-markdown_github/unnamed-chunk-15-1.png)
+![](VaR_SP500_Nikkei225_files/figure-markdown_github/unnamed-chunk-16-1.png)
