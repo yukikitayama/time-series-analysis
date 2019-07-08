@@ -65,6 +65,54 @@ sp_5_quant
     ##          5% 
     ## -0.01694837
 
+Downside risk measures
+======================
+
+Semi-deviation: calculation of variability of returns below the mean return.
+
+``` r
+# SemiDeviation
+SemiDeviation(sp)
+```
+
+    ##                      close
+    ## Semi-Deviation 0.008305378
+
+``` r
+# Value at risk
+VaR(sp, p = 0.05)
+```
+
+    ##           close
+    ## VaR -0.01591827
+
+``` r
+# Expected shortfall
+ES(sp, p = 0.05)
+```
+
+    ##          close
+    ## ES -0.01816064
+
+table.Drawdowns() reports the five largest drawdown episodes over a sample period.
+
+``` r
+table.Drawdowns(sp)
+```
+
+    ##         From     Trough         To   Depth Length To Trough Recovery
+    ## 1 2007-10-10 2009-03-09 2013-03-28 -0.5678   1376       355     1021
+    ## 2 2000-03-27 2002-10-09 2007-05-30 -0.4915   1803       637     1166
+    ## 3 1987-08-26 1987-12-04 1989-07-26 -0.3351    485        71      414
+    ## 4 1990-07-17 1990-10-11 1991-02-13 -0.1992    148        62       86
+    ## 5 1998-07-20 1998-08-31 1998-11-23 -0.1934     90        31       59
+
+``` r
+chart.Drawdown(sp)
+```
+
+![](VaR_SP500_files/figure-markdown_github/unnamed-chunk-7-1.png)
+
 Model
 =====
 
@@ -100,7 +148,7 @@ VaRplot(alpha = 0.05,
         VaR = garchVaR)
 ```
 
-![](VaR_SP500_files/figure-markdown_github/unnamed-chunk-8-1.png)
+![](VaR_SP500_files/figure-markdown_github/unnamed-chunk-11-1.png)
 
 Exceedance and VaR coverage
 ===========================
