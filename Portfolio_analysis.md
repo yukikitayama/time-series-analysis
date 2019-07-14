@@ -9,6 +9,10 @@ library(xts)
 library(quantmod)
 library(tseries)
 library(PerformanceAnalytics)
+library(PortfolioAnalytics)
+library(ROI)
+library(ROI.plugin.quadprog)
+library(ROI.plugin.glpk)
 ```
 
 Data
@@ -26,6 +30,8 @@ head(price)
     ## 1998-04-30 1111.75 15641.26 87.93 15.56  2535
     ## 1998-05-29 1090.82 15670.78 74.71 15.21  2650
     ## 1998-06-30 1133.84 15830.27 71.72 14.30  2720
+
+Use monthly data.
 
 ``` r
 plot.zoo(price)
@@ -55,6 +61,246 @@ table.AnnualizedReturns(returns)
     ## Annualized Std Dev        0.1492 0.1945  0.3775 0.3302  0.4532
     ## Annualized Sharpe (Rf=0%) 0.3048 0.0458 -0.0093 0.1429 -0.1319
 
+Correlation
+===========
+
+``` r
+chart.Correlation(returns)
+```
+
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-6-1.png)
+
+Risk-reward scatter diagram
+===========================
+
+``` r
+means <- apply(returns, 2, mean)
+sds <- apply(returns, 2, sd)
+
+plot(sds, means, 
+     xlab = "Volatilities",
+     ylab = "Means",
+     main = "Risk-reward scatter diagram",
+     xlim = c(0.04, 0.14),
+     ylim = c(0.002, 0.009))
+text(sds, means+0.0005, labels = colnames(returns), cex = 1)
+abline(h = 0, lty = 3)
+```
+
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-7-1.png)
+
+Mean - Standard Deviation
+=========================
+
+``` r
+port_spec <- portfolio.spec(colnames(returns))
+port_spec <- add.constraint(portfolio = port_spec, type = "full_investment")
+port_spec <- add.constraint(portfolio = port_spec, type = "long_only")
+port_spec <- add.objective(portfolio = port_spec, type = "return", name = "mean")
+port_spec <- add.objective(portfolio = port_spec, type = "risk", name = "StdDev")
+print(port_spec)
+```
+
+    ## **************************************************
+    ## PortfolioAnalytics Portfolio Specification 
+    ## **************************************************
+    ## 
+    ## Call:
+    ## portfolio.spec(assets = colnames(returns))
+    ## 
+    ## Number of assets: 5 
+    ## Asset Names
+    ## [1] "sp"     "nikkei" "gold"   "oil"    "tepco" 
+    ## 
+    ## Constraints
+    ## Enabled constraint types
+    ##      - full_investment 
+    ##      - long_only 
+    ## 
+    ## Objectives:
+    ## Enabled objective names
+    ##      - mean 
+    ##      - StdDev
+
+``` r
+opt <- optimize.portfolio(returns, portfolio = port_spec, optimize_method = "random", trace = TRUE)
+```
+
+    ## Leverage constraint min_sum and max_sum are restrictive, 
+    ##               consider relaxing. e.g. 'full_investment' constraint should be min_sum=0.99 and max_sum=1.01
+
+    ## Warning: executing %dopar% sequentially: no parallel backend registered
+
+``` r
+chart.RiskReward(opt, risk.col = "StdDev", return.col = "mean", chart.assets = TRUE)
+```
+
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-10-1.png)
+
+Equal weight benchmark
+======================
+
+``` r
+# setup
+n <- ncol(returns)
+equal_weight <- rep(1/n, n)
+
+# calculate return
+benchmark_returns <- Return.portfolio(
+  R = returns,
+  weights = equal_weight,
+  rebalance_on = "years"
+)
+colnames(benchmark_returns) <- "benchmark"
+
+# Benchmark performace
+table.AnnualizedReturns(benchmark_returns)
+```
+
+    ##                           benchmark
+    ## Annualized Return            0.0549
+    ## Annualized Std Dev           0.1884
+    ## Annualized Sharpe (Rf=0%)    0.2914
+
+Base portfolio
+==============
+
+A simple approach with relaxed constraints and basic objective.
+
+``` r
+# Base portfolio specification
+base_port_spec <- portfolio.spec(assets = colnames(returns))
+base_port_spec <- add.constraint(portfolio = base_port_spec, type = "full_investment")
+base_port_spec <- add.constraint(portfolio = base_port_spec, type = "long_only")
+base_port_spec <- add.objective(portfolio = base_port_spec, type= "risk", name = "StdDev")
+```
+
+``` r
+opt_base <- optimize.portfolio.rebalancing(
+  R = returns,
+  optimize_method = "ROI",
+  portfolio = base_port_spec,
+  rebalance_on = "quarters",
+  training_period = 60,
+  rolling_window = 60
+)
+
+# Calculate portfolio returns
+base_returns <- Return.portfolio(returns, extractWeights(opt_base))
+colnames(base_returns) <- "base"
+```
+
+``` r
+# Chart the optimal weights
+chart.Weights(opt_base)
+```
+
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-14-1.png)
+
+``` r
+# Merge benchmark and base portfolio returns
+ret <- cbind(benchmark_returns, base_returns)
+
+# Annualized performance
+table.AnnualizedReturns(ret)
+```
+
+    ##                           benchmark   base
+    ## Annualized Return            0.0549 0.0280
+    ## Annualized Std Dev           0.1884 0.1547
+    ## Annualized Sharpe (Rf=0%)    0.2914 0.1810
+
+Refine constraints.
+
+``` r
+box_port_spec <- base_port_spec
+
+print(box_port_spec)
+```
+
+    ## **************************************************
+    ## PortfolioAnalytics Portfolio Specification 
+    ## **************************************************
+    ## 
+    ## Call:
+    ## portfolio.spec(assets = colnames(returns))
+    ## 
+    ## Number of assets: 5 
+    ## Asset Names
+    ## [1] "sp"     "nikkei" "gold"   "oil"    "tepco" 
+    ## 
+    ## Constraints
+    ## Enabled constraint types
+    ##      - full_investment 
+    ##      - long_only 
+    ## 
+    ## Objectives:
+    ## Enabled objective names
+    ##      - StdDev
+
+Use indexnum argument to update specifications. For example, indexnum = 2 updates the second constraints from "long\_only" to "box".
+
+``` r
+# Update the contraints
+box_port_spec <- add.constraint(portfolio = box_port_spec, type = "box", min = 0.01, max = 0.6, indexnum = 2)
+
+print(box_port_spec)
+```
+
+    ## **************************************************
+    ## PortfolioAnalytics Portfolio Specification 
+    ## **************************************************
+    ## 
+    ## Call:
+    ## portfolio.spec(assets = colnames(returns))
+    ## 
+    ## Number of assets: 5 
+    ## Asset Names
+    ## [1] "sp"     "nikkei" "gold"   "oil"    "tepco" 
+    ## 
+    ## Constraints
+    ## Enabled constraint types
+    ##      - full_investment 
+    ##      - box 
+    ## 
+    ## Objectives:
+    ## Enabled objective names
+    ##      - StdDev
+
+``` r
+# Backtest
+opt_box <- optimize.portfolio.rebalancing(
+  R = returns,
+  optimize_method = "ROI",
+  portfolio = box_port_spec,
+  rebalance_on = "quarters",
+  training_period = 60,
+  rolling_window = 60
+)
+
+# Calculate portfolio returns
+box_returns <- Return.portfolio(returns, extractWeights(opt_box))
+colnames(box_returns) <- "box"
+
+# Chart the optimal weights
+chart.Weights(opt_box)
+```
+
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-18-1.png)
+
+``` r
+# Merge box portfolio returns
+ret <- cbind(ret, box_returns)
+
+# Annualized performance
+table.AnnualizedReturns(ret)
+```
+
+    ##                           benchmark   base    box
+    ## Annualized Return            0.0549 0.0280 0.0278
+    ## Annualized Std Dev           0.1884 0.1547 0.1559
+    ## Annualized Sharpe (Rf=0%)    0.2914 0.1810 0.1782
+
 Mean-variance efficient portfolio
 =================================
 
@@ -65,7 +311,7 @@ names(pf_weights) <- colnames(returns)
 barplot(pf_weights)
 ```
 
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-6-1.png)
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-20-1.png)
 
 ``` r
 # Expected portfolio return 
@@ -136,7 +382,7 @@ abline(a = 0, b = 1, lty = 3)
 text(pf_estim$pw, pf_eval$pw+0.04, labels = colnames(returns))
 ```
 
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-9-1.png)
+![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-23-1.png)
 
 a scatter plot of the evaluation portfolio weights versus the estimation portfolio weights. If portfolio weights are identical, they should be on the 45 degree line.
 
@@ -179,47 +425,6 @@ table.AnnualizedReturns(returns_pf_eval)
     ## Annualized Std Dev                   0.2269
     ## Annualized Sharpe (Rf=0%)            0.0570
 
-Correlation
-===========
-
-``` r
-chart.Correlation(returns)
-```
-
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-13-1.png)
-
-Rolling 24-month estimates of correlation
-=========================================
-
-``` r
-chart.RollingCorrelation(returns$sp, returns$nikkei, width = 24)
-```
-
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-14-1.png)
-
-``` r
-chart.RollingCorrelation(returns$nikkei, returns$gold, width = 24)
-```
-
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-15-1.png)
-
-Risk-reward scatter diagram
-===========================
-
-``` r
-means <- apply(returns, 2, mean)
-sds <- apply(returns, 2, sd)
-
-plot(sds, means, 
-     xlab = "Volatilities",
-     ylab = "Means",
-     main = "Risk-reward scatter diagram")
-text(sds, means+0.0002, labels = colnames(returns), cex = 0.7)
-abline(h = 0, lty = 3)
-```
-
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-16-1.png)
-
 Risk budget
 ===========
 
@@ -245,89 +450,50 @@ weights_percrisk
     ## oil        0.2       0.23280612
     ## tepco      0.2       0.29399703
 
-Rolling annualized mean and volatility
-======================================
-
 ``` r
-chart.RollingPerformance(
-  R = returns$sp,
-  width = 12,
-  FUN = "Return.annualized"
-)
+# extractWeights(opt)
 ```
 
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-18-1.png)
-
 ``` r
-chart.RollingPerformance(
-  R = returns$sp,
-  width = 12,
-  FUN = "StdDev.annualized"
-)
+# chart.Weights(opt)
 ```
 
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-19-1.png)
-
-Downside risk measures
-======================
-
 ``` r
-# Semi-deviation: variability of returns below the mean return
-SemiDeviation(returns$nikkei)
+# port_spec <- portfolio.spec(assets = colnames(returns))
+# port_spec <- add.constraint(portfolio = port_spec, type = "full_investment")
+# port_spec <- add.constraint(portfolio = port_spec, type = "long_only")
+# poer_spec <- add.objective(portfolio = port_spec, type = "return", name = "mean")
+# port_spec <- add.objective(portfolio = port_spec, type = "risk", name = "var", risk_aversion = 10)
+# print(port_spec)
 ```
 
-    ##                    nikkei
-    ## Semi-Deviation 0.04199444
-
 ``` r
-# Value at risk
-VaR(returns$nikkei)
+# opt <- optimize.portfolio(R = returns, portfolio = port_spec, optimize_method = "ROI")
+# print(opt)
 ```
 
-    ##          nikkei
-    ## VaR -0.09473446
-
 ``` r
-# Expected shortfall
-ES(returns$nikkei)
+# extractWeights(opt)
 ```
 
-    ##        nikkei
-    ## ES -0.1433515
-
-Drawdown episodes
-=================
-
 ``` r
-table.Drawdowns(returns$gold)
+# chart.Weights(opt)
 ```
 
-    ##         From     Trough         To   Depth Length To Trough Recovery
-    ## 1 2011-01-31 2015-12-31       <NA> -0.8001     97        60       NA
-    ## 2 2008-03-31 2008-10-31 2010-09-30 -0.5876     31         8       23
-    ## 3 1998-05-29 2000-10-31 2003-08-29 -0.5011     64        30       34
-    ## 4 2003-12-31 2004-04-30 2005-09-30 -0.2528     22         5       17
-    ## 5 2006-05-31 2006-09-29 2007-09-28 -0.1878     17         5       12
+Rebalancing
+===========
 
 ``` r
-chart.Drawdown(returns$gold)
+# opt_rebal <- optimize.portfolio.rebalancing(
+#   R = returns,
+#   portfolio = port_spec,
+#   optimize_method = "ROI",
+#   rebalance_on = "quarters",
+#   training_period = 60,
+#   rolling_window = 60
+# )
 ```
 
-![](Portfolio_analysis_files/figure-markdown_github/unnamed-chunk-22-1.png)
-
-Efficient frontier
-==================
-
 ``` r
-# returnmu <- colMeans(returns)
-# grid <- seq(from = 0.01, to = max(returnmu), length.out = 50)
-# vpm <- vpsd <- rep(NA, length(grid))
-# mweights <- matrix(NA, 50, ncol(returns))
-
-# for (i in 1:length(grid)) {
-#   opt <- portfolio.optim(x = returns, pm = grid[i])
-#   vpm[i] <- opt$pm
-#   vpsd[i] <- opt$ps
-#   mweights[i, ] <- opt$pw
-# }
+# chart.Weights(opt_rebal)
 ```
